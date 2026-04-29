@@ -5,7 +5,7 @@
 ## 运行方式
 
 ```bash
-pip install fastapi uvicorn pytest
+pip install -r requirements.txt
 uvicorn app:app --reload
 ```
 
