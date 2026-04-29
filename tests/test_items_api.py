@@ -7,10 +7,11 @@ client = TestClient(app)
 
 def setup_function() -> None:
     items_db.clear()
-    # Reset id counter
+    # Reset id counter and hive singleton
     import app as app_module
 
     app_module.next_id = 1
+    app_module.hive_client = None
 
 
 def test_health() -> None:
@@ -71,3 +72,31 @@ def test_delete_item_not_found() -> None:
     response = client.delete("/items/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Item not found"
+
+
+def test_hive_query_success(monkeypatch) -> None:
+    class FakeHive:
+        def get_info(self, _sql: str):
+            return [(1, "ok")]
+
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "get_hive_client", lambda: FakeHive())
+
+    response = client.post("/hive/query", json={"sql": "select 1"})
+    assert response.status_code == 200
+    assert response.json() == {"rows": [[1, "ok"]]}
+
+
+def test_hive_query_failure(monkeypatch) -> None:
+    class FakeHive:
+        def get_info(self, _sql: str):
+            raise RuntimeError("boom")
+
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "get_hive_client", lambda: FakeHive())
+
+    response = client.post("/hive/query", json={"sql": "select 1"})
+    assert response.status_code == 500
+    assert "Hive query failed" in response.json()["detail"]

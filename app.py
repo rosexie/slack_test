@@ -13,8 +13,13 @@ class Item(ItemIn):
     id: int
 
 
+class HiveQueryIn(BaseModel):
+    sql: str
+
+
 items_db: dict[int, Item] = {}
 next_id = 1
+hive_client = None
 
 
 @app.get("/health")
@@ -61,3 +66,22 @@ def delete_item(item_id: int) -> dict[str, str]:
 
     del items_db[item_id]
     return {"message": "Item deleted"}
+
+
+def get_hive_client():
+    global hive_client
+    if hive_client is None:
+        from deal_hive import DealHive
+
+        hive_client = DealHive()
+    return hive_client
+
+
+@app.post("/hive/query")
+def run_hive_query(payload: HiveQueryIn) -> dict[str, list[list[object]]]:
+    try:
+        rows = get_hive_client().get_info(payload.sql)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Hive query failed: {exc}") from exc
+
+    return {"rows": [list(row) for row in rows]}
